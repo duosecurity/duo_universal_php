@@ -1,12 +1,19 @@
 <?php declare(strict_types=1);
 namespace Duo\Tests;
 
+use \Firebase\JWT\JWT;
 use Duo\DuoUniversal\Client;
 use Duo\DuoUniversal\DuoException;
 use PHPUnit\Framework\TestCase;
 
 final class ClientTest extends TestCase
 {
+    public $username = "user";
+    public $bad_username = "baduser";
+    public $code = "abcdefghijkl";
+    public $bad_expiration = 1234567;
+    public $nonce = "deadbeefdeadbeefdeadbeef";
+    public $bad_nonce = "beefdeadbeefdeadbeef";
     public $client_id = "12345678901234567890";
     public $client_secret = "1234567890123456789012345678901234567890";
     public $api_host = "api-123456.duo.com";
@@ -16,28 +23,108 @@ final class ClientTest extends TestCase
     public $bad_client_secret = "1111111111111111111111111111111111111111";
     public $bad_api_host = 123456;
     public $bad_redirect_url = 123456;
-    public $good_http_request = "{\"response\": {\"timestamp\": 1607009339}, \"stat\": \"OK\"}";
-    public $bad_http_request = "{\"message\": \"invalid_client\", \"code\": 40002, \"timestamp\": 1607014550, \"message_detail\": \"Failed to verify signature.\", \"stat\": \"FAIL\"}";
-    public $missing_stat_health_check = "{\"response\": {\"timestamp\": 1607009339}}";
-    public $missing_message_health_check = "{\"stat\": \"Fail\"}";
+    public $good_http_request = ["response" => ["timestamp" => 1607009339],
+                                 "stat" => "OK"];
+    public $bad_http_request = ["message" => "invalid_client",
+                                "code" => 40002,
+                                "timestamp" => 1607014550,
+                                "message_detail" => "Failed to verify signature.",
+                                "stat" => "FAIL"];
+    public $missing_stat_health_check = ["response" => ["timestamp" => 1607009339]];
+    public $missing_message_health_check = ["stat" => "Fail"];
     public $bad_http_request_exception = "invalid_client: Failed to verify signature.";
     public $bad_http_connection = false;
-    public $expected_good_http_request = array("response" => array("timestamp" => 1607009339), "stat" => "OK");
+    public $expected_good_http_request = array("response" => array("timestamp" => 1607009339),
+                                         "stat" => "OK");
 
+    /**
+     * Create Client
+     */
+    public function createGoodClient()
+    {
+        return new Client(
+            $this->client_id,
+            $this->client_secret,
+            $this->api_host,
+            $this->redirect_url
+        );
+    }
+
+    /**
+     * Create Client with mocked out makeHttpsCall() to return $result
+     *
+     * @param string $result            The data makeHttpsCall will return when running test
+     * @param string $bad_client_secret (Optional) Use bad client secret to create client
+     */
+    public function createClientMockHttp($result, $bad_client_secret = null)
+    {
+        $client_secret = $bad_client_secret ? $bad_client_secret : $this->client_secret;
+        $client = $this->getMockBuilder(Client::class)
+            ->setConstructorArgs([$this->client_id, $client_secret, $this->api_host, $this->redirect_url])
+            ->setMethods(['makeHttpsCall'])
+            ->getMock();
+        $client->method('makeHttpsCall')
+            ->will($this->returnValue($result));
+        return $client;
+    }
+
+    /**
+     * Creates and signs jwt to be used for id_token in createTokenResult.
+     *
+     * @param string                  $remove_index Removes entry in $payload
+     * @param array[string => string] $change_val   Changes entry for key to new value in $payload
+     *
+     * @return encoded JWT
+     */
+    public function createIdToken($remove_index = null, $change_val = null)
+    {
+        $date = new \DateTime();
+        $current_date = $date->getTimestamp();
+        $payload = ["exp" => $current_date + Client::JWT_EXPIRATION,
+                "iat" => $current_date,
+                "iss" => "https://" . $this->api_host . Client::TOKEN_ENDPOINT,
+                "aud" => $this->client_id,
+                "preferred_username" => $this->username,
+                "nonce" => $this->nonce
+        ];
+        if ($remove_index) {
+            unset($payload[$remove_index]);
+        }
+        if ($change_val) {
+            $payload[key($change_val)] = $change_val[0];
+        }
+        return JWT::encode($payload, $this->client_secret, Client::SIG_ALGORITHM);
+    }
+
+    /**
+     * Create token result returned From Duo after exchange with code.
+     *
+     * @param string $id_token     A signed JWT
+     * @param string $remove_index The name of the entry to be removed
+     *
+     * @return string A json_encoded string
+     */
+    public function createTokenResult($id_token = null)
+    {
+        if (!$id_token) {
+            $id_token = $this->createIdToken();
+        }
+        $result = ["id_token" => $id_token,
+                "access_token" => "90101112",
+                "expires_in" => "1234567890",
+                "token_type" => "Bearer"];
+        return $result;
+    }
 
     /**
      * Test that creating a client with proper inputs does not throw an error.
      */
     public function testClientGood(): void
     {
-        $client = new Client(
-            $this->client_id,
-            $this->client_secret,
-            $this->api_host,
-            $this->redirect_url
-        );
-        $this->assertTrue(true);
+        $client = $this->createGoodClient();
+        $this->assertInstanceOf(Client::class, $client);
     }
+
     /**
      * Test that an invalid client_id will cause the Client to throw a DuoException
      */
@@ -106,12 +193,7 @@ final class ClientTest extends TestCase
      */
     public function testGenerateState(): void
     {
-        $client = new Client(
-            $this->client_id,
-            $this->client_secret,
-            $this->api_host,
-            $this->redirect_url
-        );
+        $client = $this->createGoodClient();
         $string_1 = $client->generateState();
         $this->assertNotEquals(
             $string_1,
@@ -124,12 +206,7 @@ final class ClientTest extends TestCase
      */
     public function testHealthCheckGood(): void
     {
-        $client = $this->getMockBuilder(Client::class)
-            ->setConstructorArgs([$this->client_id, $this->client_secret, $this->api_host, $this->redirect_url])
-            ->setMethods(['makeHttpsCall'])
-            ->getMock();
-        $client->method('makeHttpsCall')
-            ->will($this->returnValue($this->good_http_request));
+        $client = $this->createClientMockHttp($this->good_http_request);
         $result = $client->healthCheck();
         $this->assertEquals($this->expected_good_http_request, $result);
     }
@@ -157,12 +234,7 @@ final class ClientTest extends TestCase
     {
         $this->expectException(DuoException::class);
         $this->expectExceptionMessage($this->bad_http_request_exception);
-        $client = $this->getMockBuilder(Client::class)
-            ->setConstructorArgs([$this->client_id, $this->client_secret, $this->api_host, $this->redirect_url])
-            ->setMethods(['makeHttpsCall'])
-            ->getMock();
-        $client->method('makeHttpsCall')
-            ->will($this->returnValue($this->bad_http_request));
+        $client = $this->createClientMockHttp($this->bad_http_request);
         $client->healthCheck();
     }
 
@@ -173,12 +245,7 @@ final class ClientTest extends TestCase
     {
         $this->expectException(DuoException::class);
         $this->expectExceptionMessage(Client::MALFORMED_RESPONSE);
-        $client = $this->getMockBuilder(Client::class)
-            ->setConstructorArgs([$this->client_id, $this->client_secret, $this->api_host, $this->redirect_url])
-            ->setMethods(['makeHttpsCall'])
-            ->getMock();
-        $client->method('makeHttpsCall')
-            ->will($this->returnValue($this->missing_stat_health_check));
+        $client = $this->createClientMockHttp($this->missing_stat_health_check);
         $client->healthCheck();
     }
 
@@ -189,12 +256,191 @@ final class ClientTest extends TestCase
     {
         $this->expectException(DuoException::class);
         $this->expectExceptionMessage(Client::MALFORMED_RESPONSE);
-        $client = $this->getMockBuilder(Client::class)
-            ->setConstructorArgs([$this->client_id, $this->client_secret, $this->api_host, $this->redirect_url])
-            ->setMethods(['makeHttpsCall'])
-            ->getMock();
-        $client->method('makeHttpsCall')
-            ->will($this->returnValue($this->missing_message_health_check));
+        $client = $this->createClientMockHttp($this->missing_message_health_check);
         $client->healthCheck();
+    }
+
+    /**
+     * Test missing code parameter in token exchange throws error.
+     */
+    public function testTokenExchangeNoCode(): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::MISSING_CODE_ERROR);
+        $client = $this->createGoodClient();
+        $client->exchangeAuthorizationCodeFor2FAResult(null, $this->username);
+    }
+
+    /**
+     * Test missing username parameter during token exchange throws error.
+     */
+    public function testTokenExchangeNoUsername(): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::USERNAME_ERROR);
+        $client = $this->createGoodClient();
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, null);
+    }
+
+    /**
+     * @dataProvider providerMissingResponseField
+     */
+    public function testMissingResponseField($missing_field): void
+    {
+        $result = $this->createTokenResult();
+        unset($result[$missing_field]);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::MALFORMED_RESPONSE);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Provides a list of missing fields for the response when hitting the TOKEN_ENDPOINT.
+     */
+    public function providerMissingResponseField()
+    {
+        return [
+            ["token_type"],
+            ["access_token"],
+            ["expires_in"],
+            ["id_token"]
+        ];
+    }
+    /**
+     * Test bad token_type in response during token exchange throws an error.
+     */
+    public function testTokenExchangeBadTokenType(): void
+    {
+        $result_good = $this->createTokenResult();
+        $result = str_replace('Bearer', 'BadTokenType', $result_good);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::MALFORMED_RESPONSE);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test bad nonce in id_token during token exchange throws an error.
+     */
+    public function testTokenExchangeBadNonce(): void
+    {
+        $payload = $this->createIdToken("nonce");
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::NONCE_ERROR);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username, $this->bad_nonce);
+    }
+
+    /**
+     * Test bad JWT signature for id_token during token exchange throws an error.
+     */
+    public function testTokenExchangeBadSig(): void
+    {
+        $result = $this->createTokenResult();
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::JWT_DECODE_ERROR);
+        $client = $this->createClientMockHttp($result, $this->bad_client_secret);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test expired id_token during token exchange throws an error.
+     */
+    public function testTokenExchangeExpired(): void
+    {
+        $expired = ["exp" => $this->bad_expiration];
+        $payload = $this->createIdToken(null, $expired);
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::JWT_DECODE_ERROR);
+        $client = $this->createClientMockHttp($result, $this->bad_client_secret);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * @dataProvider providerMissingField
+     */
+    public function testMissingField($missing_field, $expected_response): void
+    {
+        $payload = $this->createIdToken($missing_field);
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage($expected_response);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username, $this->nonce);
+    }
+
+    /**
+     * Provides a list of missing fields and expected expections
+     * for the id_token in the response when hitting the TOKEN_ENDPOINT.
+     */
+    public function providerMissingField()
+    {
+        return [
+            [ "exp", Client::MALFORMED_RESPONSE],
+            [ "iat", Client::MALFORMED_RESPONSE],
+            [ "iss", Client::MALFORMED_RESPONSE],
+            [ "aud", Client::MALFORMED_RESPONSE],
+            [ "nonce", Client::NONCE_ERROR],
+            [ "preferred_username", Client::USERNAME_ERROR ]
+        ];
+    }
+
+    /**
+     * Test bad iss in id_token during token exchange throws an error.
+     */
+    public function testTokenExchangeBadIss(): void
+    {
+        $bad_iss = ["iss" => "https://" . $this->bad_api_host . Client::TOKEN_ENDPOINT];
+        $payload = $this->createIdToken(null, $bad_iss);
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::MALFORMED_RESPONSE);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test bad aud in id_token during token exchange throws an error.
+     */
+    public function testTokenExchangeBadAud(): void
+    {
+        $bad_aud = ["aud" => $this->bad_client_id];
+        $payload = $this->createIdToken(null, $bad_aud);
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::MALFORMED_RESPONSE);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test wrong preferred_username in id_token during token exchange throws an error.
+     */
+    public function testTokenExchangeBadUsername(): void
+    {
+        $bad_aud = ["preferred_username" => $this->bad_username];
+        $payload = $this->createIdToken(null, $bad_aud);
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::USERNAME_ERROR);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test a successful token exchange.
+     */
+    public function testTokenExchangeSuccess(): void
+    {
+        $id_token = $this->createIdToken();
+        $result = $this->createTokenResult($id_token);
+        $expected_result_obj = JWT::decode($id_token, $this->client_secret, [Client::SIG_ALGORITHM]);
+        $expected_result = json_decode(json_encode($expected_result_obj), true);
+        $client = $this->createClientMockHttp($result);
+        $exchange_result = $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+        $this->assertEquals($expected_result, $exchange_result);
     }
 }
