@@ -45,6 +45,7 @@ class Client
 
     const HEALTH_CHECK_ENDPOINT = "/oauth/v1/health_check";
     const TOKEN_ENDPOINT = "/oauth/v1/token";
+    const AUTHORIZE_ENDPOINT = "/oauth/v1/authorize";
 
     const USERNAME_ERROR = "The username is invalid.";
     const NONCE_ERROR = "The nonce is invalid.";
@@ -230,6 +231,54 @@ class Client
             throw new DuoException($this->getExceptionFromResult($result));
         }
         return $result;
+    }
+
+    /*
+     * Generate URI to redirect to for the Duo prompt.
+     *
+     * @param string $username The username of the user trying to auth
+     * @param string $state    Randomly generated character string of at least 22
+     *                         chars returned to the integration by Duo after 2FA
+     *
+     * @return string The URI used to redirect to the Duo prompt
+     * @throws DuoException For invalid inputs
+     */
+    public function createAuthUrl($username, $state)
+    {
+        if (!is_string($state)
+            || strlen($state) < self::MIN_STATE_LENGTH || strlen($state) > self::MAX_STATE_LENGTH
+        ) {
+            throw new DuoException(self::DUO_STATE_ERROR);
+        } elseif (!is_string($username)) {
+            throw new DuoException(self::USERNAME_ERROR);
+        }
+
+        $date = new \DateTime();
+        $current_date = $date->getTimestamp();
+        $payload = [
+            'scope' => 'openid',
+            'redirect_uri' => $this->redirect_url,
+            'client_id' => $this->client_id,
+            'iss' => $this->client_id,
+            'aud' => "https://" . $this->api_host,
+            'exp' => $current_date + self::JWT_EXPIRATION,
+            'state' => $state,
+            'response_type' => 'code',
+            'duo_uname' => $username,
+            'use_duo_code_attribute' => 'True'
+        ];
+
+        $jwt = JWT::encode($payload, $this->client_secret, self::SIG_ALGORITHM);
+        $allArgs = [
+            'response_type' => 'code',
+            'client_id' => $this->client_id,
+            'scope' => 'openid',
+            'redirect_uri' => $this->redirect_url,
+            'request' => $jwt
+        ];
+
+        $arguments = http_build_query($allArgs);
+        return "https://" . $this->api_host . self::AUTHORIZE_ENDPOINT . "?" . $arguments;
     }
 
     /**

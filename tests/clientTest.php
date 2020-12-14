@@ -10,6 +10,7 @@ final class ClientTest extends TestCase
 {
     public $username = "user";
     public $bad_username = "baduser";
+    public $non_str_username = 1234567;
     public $code = "abcdefghijkl";
     public $bad_expiration = 1234567;
     public $nonce = "deadbeefdeadbeefdeadbeef";
@@ -18,6 +19,7 @@ final class ClientTest extends TestCase
     public $client_secret = "1234567890123456789012345678901234567890";
     public $api_host = "api-123456.duo.com";
     public $redirect_url = "https://redirect_example.com";
+    public $url_enc_redirect_url = "https%3A%2F%2Fredirect_example.com";
     public $bad_client_id = "1234567890123456789";
     public $long_client_secret = "1234567890123456789012345678901234567890000";
     public $bad_client_secret = "1111111111111111111111111111111111111111";
@@ -32,6 +34,9 @@ final class ClientTest extends TestCase
                                 "stat" => "FAIL"];
     public $missing_stat_health_check = ["response" => ["timestamp" => 1607009339]];
     public $missing_message_health_check = ["stat" => "Fail"];
+    public $good_state = "deadbeefdeadbeefdeadbeefdeadbeefdead";
+    public $short_state = "deadbeefdeadbeefdeadb";
+    public $non_str_state = 123456789012345678901234567890123456;
     public $bad_http_request_exception = "invalid_client: Failed to verify signature.";
     public $bad_http_connection = false;
     public $expected_good_http_request = array("response" => array("timestamp" => 1607009339),
@@ -442,5 +447,68 @@ final class ClientTest extends TestCase
         $client = $this->createClientMockHttp($result);
         $exchange_result = $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
         $this->assertEquals($expected_result, $exchange_result);
+    }
+
+    /**
+     * Test that no username will throw an error.
+     */
+    public function testCreateAuthUrlNoUsername(): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::USERNAME_ERROR);
+        $client = $this->createGoodClient();
+        $client->createAuthUrl(null, $this->good_state);
+    }
+
+    /**
+     * Test that a non string username will throw an error.
+     */
+    public function testCreateAuthUrlNonStrUsername(): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::USERNAME_ERROR);
+        $client = $this->createGoodClient();
+        $client->createAuthUrl($this->non_str_username, $this->good_state);
+    }
+
+    /**
+     * @dataProvider providerState
+     */
+    public function testCreateAuthUrlState($state): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::DUO_STATE_ERROR);
+        $client = $this->createGoodClient();
+        $client->createAuthUrl($this->username, $state);
+    }
+
+    /**
+     * Provides a list of states for createAuthUrl
+     */
+    public function providerState()
+    {
+        $long_state = str_repeat("a", Client::MAX_STATE_LENGTH + 1);
+        return [
+            [null],
+            [$this->non_str_state],
+            [$this->short_state],
+            [$long_state]
+        ];
+    }
+
+    /**
+     * Test a successful createAuthUrl returns a good uri.
+     */
+    public function testCreateAuthUrlSuccess(): void
+    {
+        $client = $this->createGoodClient();
+        $duo_uri = $client->createAuthUrl($this->username, $this->good_state);
+        $expected_client_id = "client_id=" . $this->client_id;
+        $expected_redir_uri = "redirect_uri=" . $this->url_enc_redirect_url;
+
+        $this->assertStringContainsString($expected_client_id, $duo_uri);
+        $this->assertStringContainsString("response_type=code", $duo_uri);
+        $this->assertStringContainsString("scope=openid", $duo_uri);
+        $this->assertStringContainsString($expected_redir_uri, $duo_uri);
     }
 }
