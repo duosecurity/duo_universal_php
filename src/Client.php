@@ -2,15 +2,16 @@
 /**
  * This contains the Client class for the Universal flow
  *
- * TODO Long Description
+ * This SDK allows a web developer to quickly add Duo's interactive,
+ * self-service, two-factor authentication to any Python web login form.
  *
  * PHP version 7
  *
- * @category TODO
+ * @category Duo
  * @package  DuoUniversal
  * @author   Duo Security <support@duosecurity.com>
- * @license  https://license_url TODO: Add BSD 3-Clause "New" license
- * @link     TODO
+ * @license  https://opensource.org/licenses/BSD-3-Clause
+ * @link     https://duo.com/docs/duoweb-v4
  * @file
  */
 namespace Duo\DuoUniversal;
@@ -21,11 +22,11 @@ use \Firebase\JWT\SignatureInvalidException;
 /**
  * This class contains the client for the Universal flow
  *
- * @category TODO
+ * @category Duo
  * @package  DuoUniversal
  * @author   Duo Security <support@duosecurity.com>
- * @license  https://license_url TODO
- * @link     TODO
+ * @license  https://opensource.org/licenses/BSD-3-Clause
+ * @link     https://duo.com/docs/duoweb-v4
  */
 class Client
 {
