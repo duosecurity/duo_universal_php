@@ -302,6 +302,7 @@ class Client
         }
 
         $token_endpoint = "https://" . $this->api_host . self::TOKEN_ENDPOINT;
+        $useragent = self::USER_AGENT . " php/" . phpversion() . " " . php_uname();
         $jwt = $this->createJwtPayload($token_endpoint);
         $request = ["grant_type" => self::GRANT_TYPE,
                     "code" => $duoCode,
@@ -309,7 +310,7 @@ class Client
                     "client_id" => $this->client_id,
                     "client_assertion_type" => self::CLIENT_ASSERTION_TYPE,
                     "client_assertion" => $jwt];
-        $result = $this->makeHttpsCall(self::TOKEN_ENDPOINT, $request, self::USER_AGENT);
+        $result = $this->makeHttpsCall(self::TOKEN_ENDPOINT, $request, $useragent);
 
         /* Verify that we are recieving the expected response from Duo */
         $required_keys = ["id_token", "access_token", "expires_in", "token_type"];
