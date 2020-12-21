@@ -20,13 +20,7 @@ use \Firebase\JWT\JWT;
 use \Firebase\JWT\SignatureInvalidException;
 
 /**
- * This class contains the client for the Universal flow
- *
- * @category Duo
- * @package  DuoUniversal
- * @author   Duo Security <support@duosecurity.com>
- * @license  https://opensource.org/licenses/BSD-3-Clause
- * @link     https://duo.com/docs/duoweb-v4
+ * This class contains the client for the Universal flow.
  */
 class Client
 {
