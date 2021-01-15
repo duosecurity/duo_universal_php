@@ -12,7 +12,7 @@ php -a -d auto_prepend_file=vendor/autoload.php
 
 To run tests
 ```
-./vendor/bin/phpunit tests
+./vendor/bin/phpunit --process-isolation tests
 
 ```
 To run linter

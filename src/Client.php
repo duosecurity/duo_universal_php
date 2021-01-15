@@ -17,7 +17,10 @@
 namespace Duo\DuoUniversal;
 
 use \Firebase\JWT\JWT;
+use \Firebase\JWT\BeforeValidException;
+use \Firebase\JWT\ExpiredException;
 use \Firebase\JWT\SignatureInvalidException;
+use UnexpectedValueException;
 
 /**
  * This class contains the client for the Universal flow.
@@ -31,6 +34,7 @@ class Client
     const CLIENT_ID_LENGTH = 20;
     const CLIENT_SECRET_LENGTH = 40;
     const JWT_EXPIRATION = 300;
+    const JWT_LEEWAY = 60;
     const SUCCESS_STATUS_CODE = 200;
 
     const USER_AGENT = "duo_universal_php/0.0.1";
@@ -319,10 +323,11 @@ class Client
         }
 
         try {
+            JWT::$leeway = self::JWT_LEEWAY;
             $token_obj = JWT::decode($result['id_token'], $this->client_secret, [self::SIG_ALGORITHM]);
             /* JWT::decode returns a PHP object, this will turn the object into a multidimensional array */
             $token = json_decode(json_encode($token_obj), true);
-        } catch (SignatureInvalidException $e) {
+        } catch (SignatureInvalidException | BeforeValidException | ExpiredException | UnexpectedValueException $e) {
             throw new DuoException(self::JWT_DECODE_ERROR);
         }
 

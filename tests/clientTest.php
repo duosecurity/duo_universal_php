@@ -42,6 +42,13 @@ final class ClientTest extends TestCase
     public $expected_good_http_request = array("response" => array("timestamp" => 1607009339),
                                          "stat" => "OK");
 
+
+    protected function setUp(): void
+    {
+        // null is the default behavior and signifies that JWT will use the real current timestamp
+        JWT::$timestamp = null;
+    }
+
     /**
      * Create Client
      */
@@ -96,7 +103,7 @@ final class ClientTest extends TestCase
             unset($payload[$remove_index]);
         }
         if ($change_val) {
-            $payload[key($change_val)] = $change_val[0];
+            $payload[key($change_val)] = $change_val[key($change_val)];
         }
         return JWT::encode($payload, $this->client_secret, Client::SIG_ALGORITHM);
     }
@@ -360,8 +367,39 @@ final class ClientTest extends TestCase
         $result = $this->createTokenResult($payload);
         $this->expectException(DuoException::class);
         $this->expectExceptionMessage(Client::JWT_DECODE_ERROR);
-        $client = $this->createClientMockHttp($result, $this->bad_client_secret);
+        $client = $this->createClientMockHttp($result);
         $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test clock skew more than leeway throws an error.
+     */
+    public function testTokenExchangeLargeClockSkew(): void
+    {
+        // Simulate a clock skew (greater than the leeway) by feeding JWT a slightly different timestamp.
+        JWT::$timestamp = time() - Client::JWT_LEEWAY * 2;
+
+        $payload = $this->createIdToken();
+        $result = $this->createTokenResult($payload);
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::JWT_DECODE_ERROR);
+        $client = $this->createClientMockHttp($result);
+        $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+    }
+
+    /**
+     * Test clock skew less than leeway is successful.
+     */
+    public function testTokenExchangeSmallClockSkew(): void
+    {
+        // Simulate a clock skew (smaller than the leeway) by feeding JWT a slightly different timestamp.
+        JWT::$timestamp = time() - Client::JWT_LEEWAY / 2;
+
+        $payload = $this->createIdToken();
+        $result = $this->createTokenResult($payload);
+        $client = $this->createClientMockHttp($result);
+        $token = $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
+        $this->assertEquals($this->username, $token['preferred_username']);
     }
 
     /**
