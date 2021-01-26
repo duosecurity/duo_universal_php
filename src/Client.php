@@ -140,8 +140,14 @@ class Client
         ) {
             throw new DuoException(self::DUO_STATE_ERROR);
         }
-        $state = random_bytes($state_length);
-        return bin2hex($state);
+
+        $ALPHANUMERICS = array_merge(range('A', 'Z'), range('a', 'z'), range(0, 9));
+        $state = "";
+
+        for ($i = 0; $i < $state_length; ++$i) {
+          $state = $state . $ALPHANUMERICS[random_int(0, count($ALPHANUMERICS) - 1)];
+        }
+        return $state;
     }
 
     /**
