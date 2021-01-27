@@ -200,6 +200,23 @@ final class ClientTest extends TestCase
     }
 
     /**
+     * Test that a non-boolean use_duo_code_attribute will
+     * cause the Client to throw a DuoException
+     */
+    public function testClientBadDuoCodeAttr(): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::PARSING_CONFIG_ERROR);
+        $client = new Client(
+            $this->client_id,
+            $this->client_secret,
+            $this->api_host,
+            $this->bad_redirect_url,
+            "false"
+        );
+    }
+
+    /**
      * Test that generateState does not return the same
      * string twice.
      */
@@ -532,6 +549,51 @@ final class ClientTest extends TestCase
             [$this->short_state],
             [$long_state]
         ];
+    }
+
+    /**
+     * Test that by default we request the duo_code parameter in our JWT
+     */
+    public function testDuoCodeDefaultTrue(): void
+    {
+        $client = new Client(
+            $this->client_id,
+            $this->client_secret,
+            $this->api_host,
+            $this->redirect_url
+        );
+        $auth_url = $client->createAuthUrl($this->username, $this->good_state);
+        $jwt = $this->decodeJWTFromURL($auth_url);
+        $this->assertTrue($jwt["use_duo_code_attribute"]);
+    }
+
+    /**
+     * Test that passing false to constructor causes our JWT not request use_duo_code_attribute
+     */
+    public function testDuoCodeSetFalse(): void
+    {
+        $client = new Client(
+            $this->client_id,
+            $this->client_secret,
+            $this->api_host,
+            $this->redirect_url,
+            false
+        );
+        $auth_url = $client->createAuthUrl($this->username, $this->good_state);
+        $jwt = $this->decodeJWTFromURL($auth_url);
+        $this->assertFalse($jwt["use_duo_code_attribute"]);
+    }
+
+    /**
+     * Helper to decode a JWT from a URL
+     */
+    public function decodeJWTFromURL($url)
+    {
+        $query_str = parse_url($url, PHP_URL_QUERY);
+        parse_str($query_str, $query_params);
+        $token = $query_params["request"];
+        $result_obj = JWT::decode($token, $this->client_secret, [Client::SIG_ALGORITHM]);
+        return json_decode(json_encode($result_obj), true);
     }
 
     /**

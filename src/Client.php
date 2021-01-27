@@ -60,6 +60,7 @@ class Client
     public $client_id;
     public $api_host;
     public $redirect_url;
+    public $use_duo_code_attribute;
     private $client_secret;
 
     /**
@@ -145,7 +146,7 @@ class Client
         $state = "";
 
         for ($i = 0; $i < $state_length; ++$i) {
-          $state = $state . $ALPHANUMERICS[random_int(0, count($ALPHANUMERICS) - 1)];
+            $state = $state . $ALPHANUMERICS[random_int(0, count($ALPHANUMERICS) - 1)];
         }
         return $state;
     }
@@ -153,10 +154,11 @@ class Client
     /**
      * Validate that the client_id and client_secret are the proper length.
      *
-     * @param string $client_id      The Client ID found in the admin panel
-     * @param string $client_secret  The Client Secret found in the admin panel
-     * @param string $api_host       The api-host found in the admin panel
-     * @param string $redirect_url   The URL to redirect back to after the prompt
+     * @param string $client_id                 The Client ID found in the admin panel
+     * @param string $client_secret             The Client Secret found in the admin panel
+     * @param string $api_host                  The api-host found in the admin panel
+     * @param string $redirect_url              The URL to redirect back to after the prompt
+     * @param boolean $use_duo_code_attribute   Flag to toggle returned code attribute name
      *
      * @return void
      * @throws DuoException If parameters are not strings or for invalid Client ID or Client Secret
@@ -165,9 +167,10 @@ class Client
         $client_id,
         $client_secret,
         $api_host,
-        $redirect_url
+        $redirect_url,
+        $use_duo_code_attribute
     ) {
-        if (!is_string($client_id) || !is_string($client_secret) || !is_string($api_host) || !is_string($redirect_url)
+        if (!is_string($client_id) || !is_string($client_secret) || !is_string($api_host) || !is_string($redirect_url) || !is_bool($use_duo_code_attribute)
         ) {
             throw new DuoException(self::PARSING_CONFIG_ERROR);
         }
@@ -182,10 +185,11 @@ class Client
     /**
      * Constructor for Client class.
      *
-     * @param string $client_id     The Client ID found in the admin panel
-     * @param string $client_secret The Client Secret found in the admin panel
-     * @param string $api_host      The api-host found in the admin panel
-     * @param string $redirect_url  The URL to redirect back to after the prompt
+     * @param string $client_id               The Client ID found in the admin panel
+     * @param string $client_secret           The Client Secret found in the admin panel
+     * @param string $api_host                The api-host found in the admin panel
+     * @param string $redirect_url            The URL to redirect back to after the prompt
+     * @param boolean $use_duo_code_attribute (Optional: default true) Flag to use `duo_code` instead of `code` for returned authorization parameter
      *
      * @return void
      * @throws DuoException For invalid Client ID or Client Secret
@@ -194,18 +198,21 @@ class Client
         $client_id,
         $client_secret,
         $api_host,
-        $redirect_url
+        $redirect_url,
+        $use_duo_code_attribute = true
     ) {
         $this->validateInitialConfig(
             $client_id,
             $client_secret,
             $api_host,
-            $redirect_url
+            $redirect_url,
+            $use_duo_code_attribute
         );
         $this->client_id = $client_id;
         $this->client_secret = $client_secret;
         $this->api_host = $api_host;
         $this->redirect_url = $redirect_url;
+        $this->use_duo_code_attribute = $use_duo_code_attribute;
     }
 
     /**
@@ -238,7 +245,7 @@ class Client
         return $result;
     }
 
-    /*
+    /**
      * Generate URI to redirect to for the Duo prompt.
      *
      * @param string $username The username of the user trying to auth
@@ -270,7 +277,7 @@ class Client
             'state' => $state,
             'response_type' => 'code',
             'duo_uname' => $username,
-            'use_duo_code_attribute' => 'True'
+            'use_duo_code_attribute' => $this->use_duo_code_attribute
         ];
 
         $jwt = JWT::encode($payload, $this->client_secret, self::SIG_ALGORITHM);
