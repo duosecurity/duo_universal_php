@@ -97,6 +97,7 @@ class Client
         curl_setopt($ch, CURLOPT_URL, "https://" . $this->api_host . $endpoint);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
+        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         if ($user_agent !== null) {
             curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
