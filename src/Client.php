@@ -56,6 +56,7 @@ class Client
     const FAILED_CONNECTION = "Unable to connect to Duo";
     const MALFORMED_RESPONSE = "Result missing expected data.";
     const MISSING_CODE_ERROR = "Missing authorization code";
+    const DUO_CERTS = __DIR__ . "/ca_certs.pem";
 
     public $client_id;
     public $api_host;
@@ -98,6 +99,8 @@ class Client
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
         curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        curl_setopt($ch, CURLOPT_CAINFO, self::DUO_CERTS);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         if ($user_agent !== null) {
             curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
