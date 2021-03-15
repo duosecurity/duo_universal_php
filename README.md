@@ -11,9 +11,9 @@ What's included:
 ## Getting started
 
 <!-- TODO, add more information once package is ready -->
-To use SDK in your existting developing enviroment, install it from Packagist
+To use SDK in your existing developing environment, install it from Packagist
 ```
-composer require duosecurity/duo_universal_php
+composer require duosecurity/duo_universal
 ```
 Once it's installed, see our developer documentation at https://duo.com/docs/duoweb and `sample/index.php` in this repo for guidance on integrating Duo 2FA into your web application.
 
