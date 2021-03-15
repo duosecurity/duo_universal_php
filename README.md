@@ -1,6 +1,6 @@
 # Duo Universal PHP library
 
-This SDK alows a web developer to quickly add Duo's interactive, self-service, two-factor autentication to any PHP web login form.
+This SDK allows a web developer to quickly add Duo's interactive, self-service, two-factor authentication to any PHP web login form.
 
 
 What's included:
@@ -15,11 +15,11 @@ To use SDK in your existting developing enviroment, install it from Packagist
 ```
 composer require duosecurity/duo_universal_php
 ```
-Once it's installed, see our developer documentation at https://duo.com/docs/duoweb-v4 and `sample/index.php` in this repo for guidance on integrating Duo 2FA into your web application.
+Once it's installed, see our developer documentation at https://duo.com/docs/duoweb and `sample/index.php` in this repo for guidance on integrating Duo 2FA into your web application.
 
 
 ## Contribute
-To contribute, fork this repo and make a pull request with your changes when they'are ready.
+To contribute, fork this repo and make a pull request with your changes when they are ready.
 
 Install the SDK from source:
 ```
