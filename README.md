@@ -1,5 +1,7 @@
 # Duo Universal PHP library
 
+[![Build Status](https://github.com/duosecurity/duo_universal_php/workflows/PHP%20CI/badge.svg?branch=master)](https://github.com/duosecurity/duo_universal_php/actions)
+
 This SDK allows a web developer to quickly add Duo's interactive, self-service, two-factor authentication to any PHP web login form.
 
 
