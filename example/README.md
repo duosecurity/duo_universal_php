@@ -24,3 +24,13 @@ Then, create a `Web SDK` application in the Duo Admin Panel. See https://duo.com
     ```
 1. Navigate to http://localhost:8080.
 1. Log in with the user you would like to enroll in Duo or with an already enrolled user (any password will work).
+
+## (Optional) Run the demo using docker
+
+A dockerfile is included to easily run the demo app with a known working PHP configuration.
+
+1. Copy the Client ID, Client Secret, and API Hostname values for your `Web SDK` application into the `duo.conf` file.
+1. Build the docker image: `docker build -t duo_php_example .`
+1. Run the docker container `docker run -p 8080:8080 duo_php_example`
+1. Navigate to http://localhost:8080.
+1. Log in with the user you would like to enroll in Duo or with an already enrolled user (any password will work).
