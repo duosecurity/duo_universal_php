@@ -20,7 +20,7 @@ Then, create a `Web SDK` application in the Duo Admin Panel. See https://duo.com
 1. Copy the Client ID, Client Secret, and API Hostname values for your `Web SDK` application into the `duo.conf` file.
 1. Start the app.
     ```
-    php -S localhost:8080
+    php -d session.save_path=/tmp -S localhost:8080
     ```
 1. Navigate to http://localhost:8080.
 1. Log in with the user you would like to enroll in Duo or with an already enrolled user (any password will work).
