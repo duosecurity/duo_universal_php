@@ -11,8 +11,8 @@ What's included:
 * `tests` - Test cases
 
 ## Getting started
+This library requires PHP 7.3 or later
 
-<!-- TODO, add more information once package is ready -->
 To use SDK in your existing developing environment, install it from Packagist
 ```
 composer require duosecurity/duo_universal_php
