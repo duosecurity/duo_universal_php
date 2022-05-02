@@ -2,6 +2,7 @@
 namespace Duo\Tests;
 
 use \Firebase\JWT\JWT;
+use \Firebase\JWT\Key;
 use Duo\DuoUniversal\Client;
 use Duo\DuoUniversal\DuoException;
 use PHPUnit\Framework\TestCase;
@@ -497,7 +498,8 @@ final class ClientTest extends TestCase
     {
         $id_token = $this->createIdToken();
         $result = $this->createTokenResult($id_token);
-        $expected_result_obj = JWT::decode($id_token, $this->client_secret, [Client::SIG_ALGORITHM]);
+        $jwt_key = new Key($this->client_secret, Client::SIG_ALGORITHM);
+        $expected_result_obj = JWT::decode($id_token, $jwt_key);
         $expected_result = json_decode(json_encode($expected_result_obj), true);
         $client = $this->createClientMockHttp($result);
         $exchange_result = $client->exchangeAuthorizationCodeFor2FAResult($this->code, $this->username);
@@ -592,7 +594,8 @@ final class ClientTest extends TestCase
         $query_str = parse_url($url, PHP_URL_QUERY);
         parse_str($query_str, $query_params);
         $token = $query_params["request"];
-        $result_obj = JWT::decode($token, $this->client_secret, [Client::SIG_ALGORITHM]);
+        $jwt_key = new Key($this->client_secret, Client::SIG_ALGORITHM);
+        $result_obj = JWT::decode($token, $jwt_key);
         return json_decode(json_encode($result_obj), true);
     }
 

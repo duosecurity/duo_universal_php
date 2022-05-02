@@ -17,6 +17,7 @@
 namespace Duo\DuoUniversal;
 
 use \Firebase\JWT\JWT;
+use \Firebase\JWT\Key;
 use \Firebase\JWT\BeforeValidException;
 use \Firebase\JWT\ExpiredException;
 use \Firebase\JWT\SignatureInvalidException;
@@ -341,7 +342,8 @@ class Client
 
         try {
             JWT::$leeway = self::JWT_LEEWAY;
-            $token_obj = JWT::decode($result['id_token'], $this->client_secret, [self::SIG_ALGORITHM]);
+            $jwt_key = new Key($this->client_secret, self::SIG_ALGORITHM); 
+            $token_obj = JWT::decode($result['id_token'], @$jwt_key);
             /* JWT::decode returns a PHP object, this will turn the object into a multidimensional array */
             $token = json_decode(json_encode($token_obj), true);
         } catch (SignatureInvalidException | BeforeValidException | ExpiredException | UnexpectedValueException $e) {
