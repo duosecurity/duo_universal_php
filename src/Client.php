@@ -61,6 +61,7 @@ class Client
 
     public $client_id;
     public $api_host;
+    public $http_proxy;
     public $redirect_url;
     public $use_duo_code_attribute;
     private $client_secret;
@@ -106,6 +107,10 @@ class Client
         if ($user_agent !== null) {
             curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
         }
+        if (!is_null($this->http_proxy)) {
+            curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+            curl_setopt($ch, CURLOPT_PROXY, $this->http_proxy);
+        };
         $result = curl_exec($ch);
 
         /* Throw an error if the result doesn't exist or if our request returned a 5XX status */
@@ -204,7 +209,8 @@ class Client
         $client_secret,
         $api_host,
         $redirect_url,
-        $use_duo_code_attribute = true
+        $use_duo_code_attribute = true,
+        $http_proxy = null
     ) {
         $this->validateInitialConfig(
             $client_id,
@@ -218,6 +224,7 @@ class Client
         $this->api_host = $api_host;
         $this->redirect_url = $redirect_url;
         $this->use_duo_code_attribute = $use_duo_code_attribute;
+        $this->http_proxy = $http_proxy;
     }
 
     /**
