@@ -107,9 +107,9 @@ class Client
         if ($user_agent !== null) {
             curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
         }
-        if(!is_null($this->http_proxy)) {
-            curl_setopt( $ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP );
-            curl_setopt( $ch, CURLOPT_PROXY, $this->http_proxy);
+        if (!is_null($this->http_proxy)) {
+            curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+            curl_setopt($ch, CURLOPT_PROXY, $this->http_proxy);
         };
         $result = curl_exec($ch);
 
