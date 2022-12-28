@@ -11,7 +11,6 @@ final class ClientTest extends TestCase
 {
     public $username = "user";
     public $bad_username = "baduser";
-    public $non_str_username = 1234567;
     public $code = "abcdefghijkl";
     public $bad_expiration = 1234567;
     public $nonce = "deadbeefdeadbeefdeadbeef";
@@ -25,7 +24,6 @@ final class ClientTest extends TestCase
     public $long_client_secret = "1234567890123456789012345678901234567890000";
     public $bad_client_secret = "1111111111111111111111111111111111111111";
     public $bad_api_host = 123456;
-    public $bad_redirect_url = 123456;
     public $good_http_request = ["response" => ["timestamp" => 1607009339],
                                  "stat" => "OK"];
     public $bad_http_request = ["message" => "invalid_client",
@@ -37,9 +35,7 @@ final class ClientTest extends TestCase
     public $missing_message_health_check = ["stat" => "Fail"];
     public $good_state = "deadbeefdeadbeefdeadbeefdeadbeefdead";
     public $short_state = "deadbeefdeadbeefdeadb";
-    public $non_str_state = 123456789012345678901234567890123456;
     public $bad_http_request_exception = "invalid_client: Failed to verify signature.";
-    public $bad_http_connection = false;
     public $expected_good_http_request = array("response" => array("timestamp" => 1607009339),
                                          "stat" => "OK");
 
@@ -53,7 +49,7 @@ final class ClientTest extends TestCase
     /**
      * Create Client
      */
-    public function createGoodClient()
+    public function createGoodClient(): Client
     {
         return new Client(
             $this->client_id,
@@ -66,10 +62,10 @@ final class ClientTest extends TestCase
     /**
      * Create Client with mocked out makeHttpsCall() to return $result
      *
-     * @param string $result            The data makeHttpsCall will return when running test
+     * @param array $result             The data makeHttpsCall will return when running test
      * @param string $bad_client_secret (Optional) Use bad client secret to create client
      */
-    public function createClientMockHttp($result, $bad_client_secret = null)
+    public function createClientMockHttp(array $result, string $bad_client_secret = '')
     {
         $client_secret = $bad_client_secret ? $bad_client_secret : $this->client_secret;
         $client = $this->getMockBuilder(Client::class)
@@ -84,12 +80,12 @@ final class ClientTest extends TestCase
     /**
      * Creates and signs jwt to be used for id_token in createTokenResult.
      *
-     * @param string                  $remove_index Removes entry in $payload
-     * @param array[string => string] $change_val   Changes entry for key to new value in $payload
+     * @param string|null           $remove_index Removes entry in $payload
+     * @param array<string, string> $change_val   Changes entry for key to new value in $payload
      *
-     * @return encoded JWT
+     * @return string encoded JWT
      */
-    public function createIdToken($remove_index = null, $change_val = null)
+    public function createIdToken(?string $remove_index = null, array $change_val = []): string
     {
         $date = new \DateTime();
         $current_date = $date->getTimestamp();
@@ -113,20 +109,18 @@ final class ClientTest extends TestCase
      * Create token result returned From Duo after exchange with code.
      *
      * @param string $id_token     A signed JWT
-     * @param string $remove_index The name of the entry to be removed
      *
-     * @return string A json_encoded string
+     * @return array An array containing the token data
      */
-    public function createTokenResult($id_token = null)
+    public function createTokenResult(string $id_token = ''): array
     {
         if (!$id_token) {
             $id_token = $this->createIdToken();
         }
-        $result = ["id_token" => $id_token,
+        return ["id_token" => $id_token,
                 "access_token" => "90101112",
                 "expires_in" => "1234567890",
                 "token_type" => "Bearer"];
-        return $result;
     }
 
     /**
@@ -166,54 +160,6 @@ final class ClientTest extends TestCase
             $this->long_client_secret,
             $this->api_host,
             $this->redirect_url
-        );
-    }
-
-    /**
-     * Test that a non-string api_host will cause the Client to throw a DuoException
-     */
-    public function testClientBadApiHost(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::PARSING_CONFIG_ERROR);
-        $client = new Client(
-            $this->client_id,
-            $this->client_secret,
-            $this->bad_api_host,
-            $this->redirect_url
-        );
-    }
-
-    /**
-     * Test that a non-string redirect_url will
-     * cause the Client to throw a DuoException
-     */
-    public function testClientBadRedirectUrl(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::PARSING_CONFIG_ERROR);
-        $client = new Client(
-            $this->client_id,
-            $this->client_secret,
-            $this->api_host,
-            $this->bad_redirect_url
-        );
-    }
-
-    /**
-     * Test that a non-boolean use_duo_code_attribute will
-     * cause the Client to throw a DuoException
-     */
-    public function testClientBadDuoCodeAttr(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::PARSING_CONFIG_ERROR);
-        $client = new Client(
-            $this->client_id,
-            $this->client_secret,
-            $this->api_host,
-            $this->bad_redirect_url,
-            "false"
         );
     }
 
@@ -291,28 +237,6 @@ final class ClientTest extends TestCase
     }
 
     /**
-     * Test missing code parameter in token exchange throws error.
-     */
-    public function testTokenExchangeNoCode(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::MISSING_CODE_ERROR);
-        $client = $this->createGoodClient();
-        $client->exchangeAuthorizationCodeFor2FAResult(null, $this->username);
-    }
-
-    /**
-     * Test missing username parameter during token exchange throws error.
-     */
-    public function testTokenExchangeNoUsername(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::USERNAME_ERROR);
-        $client = $this->createGoodClient();
-        $client->exchangeAuthorizationCodeFor2FAResult($this->code, null);
-    }
-
-    /**
      * @dataProvider providerMissingResponseField
      */
     public function testMissingResponseField($missing_field): void
@@ -328,7 +252,7 @@ final class ClientTest extends TestCase
     /**
      * Provides a list of missing fields for the response when hitting the TOKEN_ENDPOINT.
      */
-    public function providerMissingResponseField()
+    public function providerMissingResponseField(): array
     {
         return [
             ["token_type"],
@@ -423,7 +347,7 @@ final class ClientTest extends TestCase
     /**
      * @dataProvider providerMissingField
      */
-    public function testMissingField($missing_field, $expected_response): void
+    public function testMissingField(string $missing_field, string $expected_response): void
     {
         $payload = $this->createIdToken($missing_field);
         $result = $this->createTokenResult($payload);
@@ -437,7 +361,7 @@ final class ClientTest extends TestCase
      * Provides a list of missing fields and expected expections
      * for the id_token in the response when hitting the TOKEN_ENDPOINT.
      */
-    public function providerMissingField()
+    public function providerMissingField(): array
     {
         return [
             [ "exp", Client::MALFORMED_RESPONSE],
@@ -507,31 +431,9 @@ final class ClientTest extends TestCase
     }
 
     /**
-     * Test that no username will throw an error.
-     */
-    public function testCreateAuthUrlNoUsername(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::USERNAME_ERROR);
-        $client = $this->createGoodClient();
-        $client->createAuthUrl(null, $this->good_state);
-    }
-
-    /**
-     * Test that a non string username will throw an error.
-     */
-    public function testCreateAuthUrlNonStrUsername(): void
-    {
-        $this->expectException(DuoException::class);
-        $this->expectExceptionMessage(Client::USERNAME_ERROR);
-        $client = $this->createGoodClient();
-        $client->createAuthUrl($this->non_str_username, $this->good_state);
-    }
-
-    /**
      * @dataProvider providerState
      */
-    public function testCreateAuthUrlState($state): void
+    public function testCreateAuthUrlState(string $state): void
     {
         $this->expectException(DuoException::class);
         $this->expectExceptionMessage(Client::DUO_STATE_ERROR);
@@ -540,14 +442,12 @@ final class ClientTest extends TestCase
     }
 
     /**
-     * Provides a list of states for createAuthUrl
+     * Provides a list of invalid states for createAuthUrl
      */
-    public function providerState()
+    public function providerState(): array
     {
         $long_state = str_repeat("a", Client::MAX_STATE_LENGTH + 1);
         return [
-            [null],
-            [$this->non_str_state],
             [$this->short_state],
             [$long_state]
         ];
@@ -589,7 +489,7 @@ final class ClientTest extends TestCase
     /**
      * Helper to decode a JWT from a URL
      */
-    public function decodeJWTFromURL($url)
+    public function decodeJWTFromURL(string $url): array
     {
         $query_str = parse_url($url, PHP_URL_QUERY);
         parse_str($query_str, $query_params);

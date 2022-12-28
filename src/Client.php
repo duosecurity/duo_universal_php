@@ -50,13 +50,11 @@ class Client
     const USERNAME_ERROR = "The username is invalid.";
     const NONCE_ERROR = "The nonce is invalid.";
     const JWT_DECODE_ERROR = "Error decoding JWT";
-    const PARSING_CONFIG_ERROR = "Error parsing config";
     const INVALID_CLIENT_ID_ERROR = "The Client ID is invalid";
     const INVALID_CLIENT_SECRET_ERROR = "The Client Secret is invalid";
     const DUO_STATE_ERROR = "State must be at least " . self::MIN_STATE_LENGTH . " characters long and no longer than " . self::MAX_STATE_LENGTH . " characters";
     const FAILED_CONNECTION = "Unable to connect to Duo";
     const MALFORMED_RESPONSE = "Result missing expected data.";
-    const MISSING_CODE_ERROR = "Missing authorization code";
     const DUO_CERTS = __DIR__ . "/ca_certs.pem";
 
     public $client_id;
@@ -73,7 +71,7 @@ class Client
      *
      * @return string The exception message taken from the message or MALFORMED_RESPONSE
      */
-    private function getExceptionFromResult($result)
+    private function getExceptionFromResult(array $result): string
     {
         if (isset($result["message"]) && isset($result["message_detail"])) {
             return $result["message"] . ": " . $result["message_detail"];
@@ -86,15 +84,14 @@ class Client
     /**
      * Make HTTPS calls to Duo.
      *
-     * @param string  $endpoint   The endpoint we are trying to hit
-     * @param any     $request    Information to send to Duo
-     * @param boolean $user_agent (Optional)True if we want to send
-     *                            a user-agent string
+     * @param string      $endpoint   The endpoint we are trying to hit
+     * @param array       $request    Information to send to Duo
+     * @param string|null $user_agent (Optional) A user-agent string
      *
      * @return array of strings
      * @throws DuoException For failure to connect to Duo
      */
-    protected function makeHttpsCall($endpoint, $request, $user_agent = null)
+    protected function makeHttpsCall(string $endpoint, array $request, ?string $user_agent = null): array
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, "https://" . $this->api_host . $endpoint);
@@ -123,7 +120,7 @@ class Client
         return json_decode($result, true);
     }
 
-    private function createJwtPayload($audience)
+    private function createJwtPayload(string $audience): string
     {
         $date = new \DateTime();
         $current_date = $date->getTimestamp();
@@ -140,12 +137,12 @@ class Client
     /**
      * Generates a random hex string.
      *
-     * @param integer $state_length The length of the hex string
+     * @param int $state_length The length of the hex string
      *
-     * @return hex string
+     * @return string A hexadecimal string
      * @throws DuoException    For lengths that are shorter than MIN_STATE_LENGTH or longer than MAX_STATE_LENGTH
      */
-    private function generateRandomString($state_length)
+    private function generateRandomString(int $state_length): string
     {
         if ($state_length > self::MAX_STATE_LENGTH || $state_length < self::MIN_STATE_LENGTH
         ) {
@@ -162,63 +159,31 @@ class Client
     }
 
     /**
-     * Validate that the client_id and client_secret are the proper length.
-     *
-     * @param string $client_id                 The Client ID found in the admin panel
-     * @param string $client_secret             The Client Secret found in the admin panel
-     * @param string $api_host                  The api-host found in the admin panel
-     * @param string $redirect_url              The URL to redirect back to after the prompt
-     * @param boolean $use_duo_code_attribute   Flag to toggle returned code attribute name
-     *
-     * @return void
-     * @throws DuoException If parameters are not strings or for invalid Client ID or Client Secret
-     */
-    private function validateInitialConfig(
-        $client_id,
-        $client_secret,
-        $api_host,
-        $redirect_url,
-        $use_duo_code_attribute
-    ) {
-        if (!is_string($client_id) || !is_string($client_secret) || !is_string($api_host) || !is_string($redirect_url) || !is_bool($use_duo_code_attribute)
-        ) {
-            throw new DuoException(self::PARSING_CONFIG_ERROR);
-        }
-        if (strlen($client_id) !== self::CLIENT_ID_LENGTH) {
-            throw new DuoException(self::INVALID_CLIENT_ID_ERROR);
-        }
-        if (strlen($client_secret) !== self::CLIENT_SECRET_LENGTH) {
-            throw new DuoException(self::INVALID_CLIENT_SECRET_ERROR);
-        }
-    }
-
-    /**
      * Constructor for Client class.
      *
      * @param string $client_id               The Client ID found in the admin panel
      * @param string $client_secret           The Client Secret found in the admin panel
      * @param string $api_host                The api-host found in the admin panel
      * @param string $redirect_url            The URL to redirect back to after the prompt
-     * @param boolean $use_duo_code_attribute (Optional: default true) Flag to use `duo_code` instead of `code` for returned authorization parameter
+     * @param bool   $use_duo_code_attribute  (Optional: default true) Flag to use `duo_code` instead of `code` for returned authorization parameter
+     * @param string|null $http_proxy         (Optional) HTTP proxy to tunnel requests through
      *
-     * @return void
      * @throws DuoException For invalid Client ID or Client Secret
      */
     public function __construct(
-        $client_id,
-        $client_secret,
-        $api_host,
-        $redirect_url,
-        $use_duo_code_attribute = true,
-        $http_proxy = null
+        string $client_id,
+        string $client_secret,
+        string $api_host,
+        string $redirect_url,
+        bool $use_duo_code_attribute = true,
+        ?string $http_proxy = null
     ) {
-        $this->validateInitialConfig(
-            $client_id,
-            $client_secret,
-            $api_host,
-            $redirect_url,
-            $use_duo_code_attribute
-        );
+        if (strlen($client_id) !== self::CLIENT_ID_LENGTH) {
+            throw new DuoException(self::INVALID_CLIENT_ID_ERROR);
+        }
+        if (strlen($client_secret) !== self::CLIENT_SECRET_LENGTH) {
+            throw new DuoException(self::INVALID_CLIENT_SECRET_ERROR);
+        }
         $this->client_id = $client_id;
         $this->client_secret = $client_secret;
         $this->api_host = $api_host;
@@ -232,7 +197,7 @@ class Client
      *
      * @return string
      */
-    public function generateState()
+    public function generateState(): string
     {
         return $this->generateRandomString(self::DEFAULT_STATE_LENGTH);
     }
@@ -243,7 +208,7 @@ class Client
      * @return array The result of the health check
      * @throws DuoException For failure to connect to Duo or failed health check
      */
-    public function healthCheck()
+    public function healthCheck(): array
     {
         $audience = "https://" . $this->api_host . self::HEALTH_CHECK_ENDPOINT;
         $jwt = $this->createJwtPayload($audience);
@@ -267,14 +232,11 @@ class Client
      * @return string The URI used to redirect to the Duo prompt
      * @throws DuoException For invalid inputs
      */
-    public function createAuthUrl($username, $state)
+    public function createAuthUrl(string $username, string $state): string
     {
-        if (!is_string($state)
-            || strlen($state) < self::MIN_STATE_LENGTH || strlen($state) > self::MAX_STATE_LENGTH
+        if (strlen($state) < self::MIN_STATE_LENGTH || strlen($state) > self::MAX_STATE_LENGTH
         ) {
             throw new DuoException(self::DUO_STATE_ERROR);
-        } elseif (!is_string($username)) {
-            throw new DuoException(self::USERNAME_ERROR);
         }
 
         $date = new \DateTime();
@@ -310,21 +272,15 @@ class Client
      *
      * @param string $duoCode  The code returned by Duo as a URL parameter after a successful authentication
      * @param string $username The username of the user trying to authenticate with Duo
-     * @param string $nonce    (Optional) Random 36B string used to associate a session with an ID token
+     * @param string|null $nonce (Optional) Random 36B string used to associate a session with an ID token
      *
-     * @return An array of strings that contains information about the authentication
+     * @return array of strings that contains information about the authentication
      *
-     * @throws DuoException For problems with parameters, malformed response from Duo,
-     *                      problems decoding the JWT, the wrong username, and the wrong nonce
+     * @throws DuoException For malformed response from Duo, problems decoding the JWT,
+     *                      the wrong username, and the wrong nonce
      */
-    public function exchangeAuthorizationCodeFor2FAResult($duoCode, $username, $nonce = null)
+    public function exchangeAuthorizationCodeFor2FAResult(string $duoCode, string $username, ?string $nonce = null): array
     {
-        if (!is_string($duoCode)) {
-            throw new DuoException(self::MISSING_CODE_ERROR);
-        } elseif (!is_string($username)) {
-            throw new DuoException(self::USERNAME_ERROR);
-        }
-
         $token_endpoint = "https://" . $this->api_host . self::TOKEN_ENDPOINT;
         $useragent = self::USER_AGENT . " php/" . phpversion() . " " . php_uname();
         $jwt = $this->createJwtPayload($token_endpoint);
@@ -336,7 +292,7 @@ class Client
                     "client_assertion" => $jwt];
         $result = $this->makeHttpsCall(self::TOKEN_ENDPOINT, $request, $useragent);
 
-        /* Verify that we are recieving the expected response from Duo */
+        /* Verify that we are receiving the expected response from Duo */
         $required_keys = ["id_token", "access_token", "expires_in", "token_type"];
         foreach ($required_keys as $key) {
             if (!isset($result[$key])) {
