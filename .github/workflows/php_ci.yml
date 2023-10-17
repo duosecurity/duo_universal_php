@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        php: [7.3, 7.4, 8.0, 8.1, 8.2]
+        php: [7.4, 8.0, 8.1, 8.2]
 
     steps:
       - name: Checkout
@@ -34,3 +34,15 @@ jobs:
 
       - name: PHP tests
         run: ./vendor/bin/phpunit --process-isolation tests
+
+      - name: Composer install example
+        working-directory: example
+        run: composer install
+
+      - name: Inject dummy example config
+        working-directory: example
+        run: printf "[duo]\nclient_id=DIAAAAAAAAAAAAAAAAAA\nclient_secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\napi_hostname=example.duosecurity.com\nredirect_uri=http://localhost:8080\nfailmode=closed\n" > ./duo.conf
+
+      - name: Ensure example runs
+        working-directory: example
+        run: php index.php
