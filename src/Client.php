@@ -63,6 +63,7 @@ class Client
     public $redirect_url;
     public $use_duo_code_attribute;
     private $client_secret;
+    private $user_agent_extension;
 
     /**
      * Retrieves exception message for DuoException from HTTPS result message.
@@ -190,6 +191,34 @@ class Client
         $this->redirect_url = $redirect_url;
         $this->use_duo_code_attribute = $use_duo_code_attribute;
         $this->http_proxy = $http_proxy;
+        $this->user_agent_extension = null;
+    }
+
+    /**
+     * Append custom information to the user agent string.
+     *
+     * @param string $user_agent_extension Custom user agent information
+     *
+     * @return void
+     */
+    public function appendToUserAgent(string $user_agent_extension): void
+    {
+        $this->user_agent_extension = trim($user_agent_extension);
+    }
+
+    /**
+     * Build the complete user agent string.
+     *
+     * @return string The complete user agent string
+     */
+    private function buildUserAgent(): string
+    {
+        $base_user_agent = self::USER_AGENT . " php/" . phpversion() . " "
+                         . php_uname();
+        if (!empty($this->user_agent_extension)) {
+            return $base_user_agent . " " . $this->user_agent_extension;
+        }
+        return $base_user_agent;
     }
 
     /**
@@ -282,7 +311,7 @@ class Client
     public function exchangeAuthorizationCodeFor2FAResult(string $duoCode, string $username, ?string $nonce = null): array
     {
         $token_endpoint = "https://" . $this->api_host . self::TOKEN_ENDPOINT;
-        $useragent = self::USER_AGENT . " php/" . phpversion() . " " . php_uname();
+        $useragent = $this->buildUserAgent();
         $jwt = $this->createJwtPayload($token_endpoint);
         $request = ["grant_type" => self::GRANT_TYPE,
                     "code" => $duoCode,
