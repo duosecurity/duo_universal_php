@@ -658,6 +658,55 @@ final class ClientTest extends TestCase
     }
 
     /**
+     * Test that creating a client with CA pinning disabled does not throw an error.
+     */
+    public function testClientCaPinningDisabled(): void
+    {
+        $client = new Client(
+            $this->client_id,
+            $this->client_secret,
+            $this->api_host,
+            $this->redirect_url,
+            true,
+            null,
+            true
+        );
+        $this->assertInstanceOf(Client::class, $client);
+    }
+
+
+    /**
+     * Test that when CA pinning is enabled (default), the client can still perform health checks.
+     */
+    public function testCaPinningEnabledHealthCheck(): void
+    {
+        $client = $this->getMockBuilder(Client::class)
+            ->setConstructorArgs([$this->client_id, $this->client_secret, $this->api_host, $this->redirect_url])
+            ->setMethods(['makeHttpsCall'])
+            ->getMock();
+        $client->method('makeHttpsCall')
+            ->will($this->returnValue($this->good_http_request));
+        $result = $client->healthCheck();
+        $this->assertEquals($this->expected_good_http_request, $result);
+    }
+
+    /**
+     * Test that when CA pinning is disabled, the client can still perform health checks.
+     */
+    public function testCaPinningDisabledHealthCheck(): void
+    {
+        $client = $this->getMockBuilder(Client::class)
+            ->setConstructorArgs([$this->client_id, $this->client_secret, $this->api_host, $this->redirect_url, true, null, true])
+            ->setMethods(['makeHttpsCall'])
+            ->getMock();
+        $client->method('makeHttpsCall')
+            ->will($this->returnValue($this->good_http_request));
+        $result = $client->healthCheck();
+        $this->assertEquals($this->expected_good_http_request, $result);
+    }
+
+
+    /**
      * Test that whitespace-only user agent extension is handled correctly.
      */
     public function testAppendToUserAgentWhitespace(): void
