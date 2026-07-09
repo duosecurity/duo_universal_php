@@ -103,6 +103,7 @@ class Client
         curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
         if (!$this->disable_ca_pinning) {
             curl_setopt($ch, CURLOPT_CAINFO, self::DUO_CERTS);
+            curl_setopt($ch, CURLOPT_CAPATH, "/dev/null/" . bin2hex(random_bytes(16)));
         }
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
