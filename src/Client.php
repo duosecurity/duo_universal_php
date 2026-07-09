@@ -65,6 +65,7 @@ class Client
     public $use_duo_code_attribute;
     private $client_secret;
     private $user_agent_extension;
+    private $disable_ca_pinning;
 
     /**
      * Retrieves exception message for DuoException from HTTPS result message.
@@ -100,7 +101,9 @@ class Client
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
         curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
-        curl_setopt($ch, CURLOPT_CAINFO, self::DUO_CERTS);
+        if (!$this->disable_ca_pinning) {
+            curl_setopt($ch, CURLOPT_CAINFO, self::DUO_CERTS);
+        }
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         if ($user_agent !== null) {
@@ -181,6 +184,7 @@ class Client
      * @param string $redirect_url            The URL to redirect back to after the prompt
      * @param bool   $use_duo_code_attribute  (Optional: default true) Flag to use `duo_code` instead of `code` for returned authorization parameter
      * @param string|null $http_proxy         (Optional) HTTP proxy to tunnel requests through
+     * @param bool   $disable_ca_pinning      (Optional: default false) Whether to disable Duo's CA certificate pinning
      *
      * @throws DuoException For invalid Client ID or Client Secret
      */
@@ -190,7 +194,8 @@ class Client
         string $api_host,
         string $redirect_url,
         bool $use_duo_code_attribute = true,
-        ?string $http_proxy = null
+        ?string $http_proxy = null,
+        bool $disable_ca_pinning = false
     ) {
         if (strlen($client_id) !== self::CLIENT_ID_LENGTH) {
             throw new DuoException(self::INVALID_CLIENT_ID_ERROR);
@@ -204,6 +209,7 @@ class Client
         $this->redirect_url = $redirect_url;
         $this->use_duo_code_attribute = $use_duo_code_attribute;
         $this->http_proxy = $http_proxy;
+        $this->disable_ca_pinning = $disable_ca_pinning;
         $this->user_agent_extension = null;
     }
 
