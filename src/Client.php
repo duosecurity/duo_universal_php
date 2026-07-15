@@ -40,6 +40,7 @@ class Client
     const SUCCESS_STATUS_CODE = 200;
 
     const USER_AGENT = "duo_universal_php/1.1.2";
+    const CA_BUNDLE_VERSION = "ca_bundle/1.0";
     const SIG_ALGORITHM = "HS512";
     const GRANT_TYPE = "authorization_code";
     const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
@@ -232,8 +233,10 @@ class Client
      */
     private function buildUserAgent(): string
     {
+        $ca_pinning_status = $this->disable_ca_pinning ? "disabled" : "enabled";
         $base_user_agent = self::USER_AGENT . " php/" . phpversion() . " "
-                         . php_uname();
+                         . php_uname() . " " . self::CA_BUNDLE_VERSION
+                         . " (ca_pinning=" . $ca_pinning_status . ")";
         if (!empty($this->user_agent_extension)) {
             return $base_user_agent . " " . $this->user_agent_extension;
         }
