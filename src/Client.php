@@ -103,7 +103,12 @@ class Client
         curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
         if (!$this->disable_ca_pinning) {
             curl_setopt($ch, CURLOPT_CAINFO, self::DUO_CERTS);
-            curl_setopt($ch, CURLOPT_CAPATH, "/dev/null/" . bin2hex(random_bytes(16)));
+            $capath = "/dev/null/" . \bin2hex(\random_bytes(16));
+            if (!curl_setopt($ch, CURLOPT_CAPATH, $capath)) {
+                throw new DuoException(
+                    "Failed to set CURLOPT_CAPATH; CA pinning cannot be enforced on this cURL/TLS backend"
+                );
+            }
         }
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

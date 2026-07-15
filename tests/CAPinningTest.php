@@ -18,6 +18,9 @@ namespace Duo\DuoUniversal {
     function curl_setopt($ch, $option, $value)
     {
         $GLOBALS['_curl_options'][$option] = $value;
+        if ($option === CURLOPT_CAPATH && ($GLOBALS['_force_capath_failure'] ?? false)) {
+            return false;
+        }
         return \curl_setopt($ch, $option, $value);
     }
 
@@ -152,6 +155,24 @@ namespace Duo\Tests {
 
             $this->assertArrayHasKey(CURLOPT_PROTOCOLS, $GLOBALS['_curl_options']);
             $this->assertEquals(CURLPROTO_HTTPS, $GLOBALS['_curl_options'][CURLOPT_PROTOCOLS]);
+        }
+
+        public function testCaPathSetFailureThrows(): void
+        {
+            $GLOBALS['_force_capath_failure'] = true;
+            try {
+                $this->expectException(\Duo\DuoUniversal\DuoException::class);
+                $this->expectExceptionMessage("Failed to set CURLOPT_CAPATH");
+                $client = new Client(
+                    $this->client_id,
+                    $this->client_secret,
+                    $this->api_host,
+                    $this->redirect_url
+                );
+                $client->healthCheck();
+            } finally {
+                $GLOBALS['_force_capath_failure'] = false;
+            }
         }
     }
 }
