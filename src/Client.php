@@ -30,8 +30,11 @@ class Client
 {
     const MAX_STATE_LENGTH = 1024;
     const MIN_STATE_LENGTH = 22;
+    const MAX_NONCE_LENGTH = 1024;
+    const MIN_NONCE_LENGTH = 16;
     const JTI_LENGTH = 36;
     const DEFAULT_STATE_LENGTH = 36;
+    const DEFAULT_NONCE_LENGTH = 36;
     const CLIENT_ID_LENGTH = 20;
     const CLIENT_SECRET_LENGTH = 40;
     const HS512_MIN_KEY_LENGTH = 64;
@@ -55,6 +58,7 @@ class Client
     const INVALID_CLIENT_ID_ERROR = "The Client ID is invalid";
     const INVALID_CLIENT_SECRET_ERROR = "The Client Secret is invalid";
     const DUO_STATE_ERROR = "State must be at least " . self::MIN_STATE_LENGTH . " characters long and no longer than " . self::MAX_STATE_LENGTH . " characters";
+    const DUO_NONCE_LENGTH_ERROR = "The nonce must be at least " . self::MIN_NONCE_LENGTH . " characters long and no longer than " . self::MAX_NONCE_LENGTH . " characters";
     const FAILED_CONNECTION = "Unable to connect to Duo";
     const MALFORMED_RESPONSE = "Result missing expected data.";
     const DUO_CERTS = __DIR__ . "/ca_certs.pem";
@@ -260,6 +264,16 @@ class Client
     }
 
     /**
+     * Generate a random string suitable for use as the nonce in createAuthUrl.
+     *
+     * @return string
+     */
+    public function generateNonce(): string
+    {
+        return $this->generateRandomString(self::DEFAULT_NONCE_LENGTH);
+    }
+
+    /**
      * Makes a call to HEALTH_CHECK_ENDPOINT to see if Duo is available.
      *
      * @return array The result of the health check
@@ -282,18 +296,28 @@ class Client
     /**
      * Generate URI to redirect to for the Duo prompt.
      *
-     * @param string $username The username of the user trying to auth
-     * @param string $state    Randomly generated character string of at least 22
-     *                         chars returned to the integration by Duo after 2FA
+     * @param string      $username The username of the user trying to auth
+     * @param string      $state    Randomly generated character string of at least 22
+     *                              chars returned to the integration by Duo after 2FA
+     * @param string|null $nonce    (Optional) Randomly generated character string used to
+     *                              associate a session with an ID token. When supplied, Duo
+     *                              echoes it back as the `nonce` claim of the ID token so it
+     *                              can be verified by exchangeAuthorizationCodeFor2FAResult().
      *
      * @return string The URI used to redirect to the Duo prompt
      * @throws DuoException For invalid inputs
      */
-    public function createAuthUrl(string $username, string $state): string
+    public function createAuthUrl(string $username, string $state, ?string $nonce = null): string
     {
         if (strlen($state) < self::MIN_STATE_LENGTH || strlen($state) > self::MAX_STATE_LENGTH
         ) {
             throw new DuoException(self::DUO_STATE_ERROR);
+        }
+
+        if ($nonce !== null
+            && (strlen($nonce) < self::MIN_NONCE_LENGTH || strlen($nonce) > self::MAX_NONCE_LENGTH)
+        ) {
+            throw new DuoException(self::DUO_NONCE_LENGTH_ERROR);
         }
 
         $date = new \DateTime();
@@ -310,6 +334,11 @@ class Client
             'duo_uname' => $username,
             'use_duo_code_attribute' => $this->use_duo_code_attribute
         ];
+
+        /* The nonce is optional; only send the claim when the caller supplied one. */
+        if ($nonce !== null) {
+            $payload['nonce'] = $nonce;
+        }
 
         $jwt = JWT::encode($payload, $this->getPaddedSecret(), self::SIG_ALGORITHM);
         $allArgs = [

@@ -83,14 +83,20 @@ $app->post('/', function (Request $request, Response $response, $args) use ($app
     # for storing the state. In some applications, strict cookie 
     # controls or other session security measures will mean a different
     # mechanism to persist the state and username will be necessary.
+    #
+    # The nonce is stored alongside it and is echoed back by Duo as the `nonce`
+    # claim of the ID token, letting the callback confirm the token belongs to
+    # this authentication attempt.
     $state = $duo_client->generateState();
+    $nonce = $duo_client->generateNonce();
     $session = new \SlimSession\Helper();
     $session->set("state", $state);
+    $session->set("nonce", $nonce);
     $session->set("username", $username);
     unset($session);
 
     # Redirect to prompt URI which will redirect to the client's redirect URI after 2FA
-    $prompt_uri = $duo_client->createAuthUrl($username, $state);
+    $prompt_uri = $duo_client->createAuthUrl($username, $state, $nonce);
     return $response
         ->withHeader('Location', $prompt_uri)
         ->withStatus(302);
@@ -118,6 +124,7 @@ $app->get('/duo-callback', function (Request $request, Response $response, $args
     # Retrieve the previously stored state and username from the session
     $session = new \SlimSession\Helper();
     $saved_state = $session->get("state");
+    $saved_nonce = $session->get("nonce");
     $username = $session->get("username");
     unset($session);
 
@@ -128,14 +135,15 @@ $app->get('/duo-callback', function (Request $request, Response $response, $args
         return $renderer->render($response, "login.php", $args);
     }
 
-    # Ensure nonce matches from initial request
+    # Ensure state matches from initial request
     if ($state != $saved_state) {
         $args["message"] = "Duo state does not match saved state";
         return $renderer->render($response, "login.php", $args);
     }
 
+    # The nonce saved above is verified against the ID token by the SDK
     try {
-        $decoded_token = $duo_client->exchangeAuthorizationCodeFor2FAResult($code, $username);
+        $decoded_token = $duo_client->exchangeAuthorizationCodeFor2FAResult($code, $username, $saved_nonce);
     } catch (DuoException $e) {
         $logger->error($e->getMessage());
         $args["message"] = "Error decoding Duo result. Confirm device clock is correct.";

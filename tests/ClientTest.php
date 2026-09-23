@@ -552,6 +552,84 @@ final class ClientTest extends TestCase
     }
 
     /**
+     * Test that a nonce passed to createAuthUrl is included in the request JWT.
+     */
+    public function testCreateAuthUrlIncludesNonce(): void
+    {
+        $client = $this->createGoodClient();
+        $auth_url = $client->createAuthUrl($this->username, $this->good_state, $this->nonce);
+        $jwt = $this->decodeJWTFromURL($auth_url);
+        $this->assertEquals($this->nonce, $jwt["nonce"]);
+    }
+
+    /**
+     * Test that the request JWT omits the nonce claim when no nonce is given.
+     */
+    public function testCreateAuthUrlWithoutNonceOmitsClaim(): void
+    {
+        $client = $this->createGoodClient();
+        $auth_url = $client->createAuthUrl($this->username, $this->good_state);
+        $jwt = $this->decodeJWTFromURL($auth_url);
+        $this->assertArrayNotHasKey("nonce", $jwt);
+    }
+
+    /**
+     * @dataProvider providerNonce
+     */
+    public function testCreateAuthUrlInvalidNonce(string $nonce): void
+    {
+        $this->expectException(DuoException::class);
+        $this->expectExceptionMessage(Client::DUO_NONCE_LENGTH_ERROR);
+        $client = $this->createGoodClient();
+        $client->createAuthUrl($this->username, $this->good_state, $nonce);
+    }
+
+    /**
+     * Provides a list of invalid nonces for createAuthUrl
+     */
+    public function providerNonce(): array
+    {
+        return [
+            [str_repeat("a", Client::MIN_NONCE_LENGTH - 1)],
+            [str_repeat("a", Client::MAX_NONCE_LENGTH + 1)]
+        ];
+    }
+
+    /**
+     * Test that a nonce at the documented minimum length is accepted.
+     */
+    public function testCreateAuthUrlShortestValidNonce(): void
+    {
+        $nonce = str_repeat("a", Client::MIN_NONCE_LENGTH);
+        $client = $this->createGoodClient();
+        $auth_url = $client->createAuthUrl($this->username, $this->good_state, $nonce);
+        $jwt = $this->decodeJWTFromURL($auth_url);
+        $this->assertEquals($nonce, $jwt["nonce"]);
+    }
+
+    /**
+     * Test that generateNonce does not return the same string twice.
+     */
+    public function testGenerateNonce(): void
+    {
+        $client = $this->createGoodClient();
+        $nonce = $client->generateNonce();
+        $this->assertNotEquals($nonce, $client->generateNonce());
+    }
+
+    /**
+     * Test that a generated nonce is accepted by createAuthUrl and round-trips
+     * through to verification during the token exchange.
+     */
+    public function testGeneratedNonceRoundTrips(): void
+    {
+        $client = $this->createGoodClient();
+        $nonce = $client->generateNonce();
+        $jwt = $this->decodeJWTFromURL($client->createAuthUrl($this->username, $this->good_state, $nonce));
+        $this->assertEquals($nonce, $jwt["nonce"]);
+    }
+
+    /**
      * Test that the user agent extension can be set and is included in requests.
      */
     public function testAppendToUserAgent(): void
